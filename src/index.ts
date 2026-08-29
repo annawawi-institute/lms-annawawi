@@ -1,6 +1,4 @@
 // src/index.ts — LMS Annawawi main entry point
-// Hono + Better Auth (D1 native) + manual RBAC middleware
-
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { html } from "hono/html";
@@ -11,15 +9,26 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", logger());
 
-// ═══════════════════════════════════════════════
-// Auth: Better Auth handler for all /api/auth/*
-// ═══════════════════════════════════════════════
-
-app.on(["GET", "POST"], "/api/auth/*", (c) => {
-  return createAuth(c.env).handler(c.req.raw);
+// Test route — verify Hono routing works
+app.get("/tes", (c) => {
+  return c.json({ msg: "hono routing works!", path: c.req.path });
 });
 
-// Migration endpoint (call once after deploy, then remove/protect in prod)
+// Better Auth — using * (single segment per Better Auth docs)
+app.all("/api/auth/*", async (c) => {
+  console.log("[AUTH] matched /api/auth/*:", c.req.method, c.req.url);
+  try {
+    const auth = createAuth(c.env);
+    const res = await auth.handler(c.req.raw);
+    console.log("[AUTH] handler status:", res.status);
+    return res;
+  } catch (err: any) {
+    console.error("[AUTH ERROR]", err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Migration endpoint
 app.post("/migrate", async (c) => {
   try {
     const auth = createAuth(c.env);
@@ -38,20 +47,14 @@ app.post("/migrate", async (c) => {
   }
 });
 
-// ═══════════════════════════════════════════════
 // Session helpers
-// ═══════════════════════════════════════════════
-
 async function getUser(c: any) {
   const auth = createAuth(c.env);
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
 }
 
-// ═══════════════════════════════════════════════
 // Login page
-// ═══════════════════════════════════════════════
-
 app.get("/login", async (c) => {
   const user = await getUser(c);
   if (user) return c.redirect("/dashboard");
@@ -71,7 +74,21 @@ app.get("/login", async (c) => {
         <h2>Login</h2>
         <p>Gunakan akun Google Anda untuk masuk ke LMS Annawawi.</p>
         <div class="actions">
-          <a href="/api/auth/sign-in/google" class="btn btn-primary">Masuk dengan Google</a>
+          <button type="submit" id="google-btn" class="btn btn-primary">Masuk dengan Google</button>
+        </div>
+        <script>
+          document.getElementById("google-btn").addEventListener("click", async (e) => {
+            e.preventDefault();
+            const res = await fetch("/api/auth/sign-in/social", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ provider: "google" }),
+            });
+            const data = await res.json();
+            if (data.url) window.location.href = data.url;
+            else alert("Error: " + JSON.stringify(data));
+          });
+        </script>
         </div>
       </div>
     </main>
@@ -80,10 +97,7 @@ app.get("/login", async (c) => {
 </html>`);
 });
 
-// ═══════════════════════════════════════════════
-// Dashboard (auth required)
-// ═══════════════════════════════════════════════
-
+// Dashboard
 app.get("/dashboard", async (c) => {
   const user = await getUser(c);
   if (!user) return c.redirect("/login");
@@ -124,52 +138,39 @@ app.get("/dashboard", async (c) => {
 </html>`);
 });
 
-// ═══════════════════════════════════════════════
-// Admin routes (admin only)
-// ═══════════════════════════════════════════════
-
+// Admin
 app.get("/admin", async (c) => {
   const user = await getUser(c);
   if (!user) return c.redirect("/login");
   if (user.role !== "admin")
-    return c.html(
-      html`<p>Anda tidak punya akses. <a href="/dashboard">Kembali</a></p>`,
-      403
-    );
+    return c.html(html`<p>Akses ditolak. <a href="/dashboard">Kembali</a></p>`, 403);
   return c.html(html`<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin — LMS Annawawi</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>Admin</h1>
-      <p>Panel administrasi LMS</p>
-    </header>
+    <header><h1>Admin</h1></header>
     <main>
       <div class="card">
         <h2>Manajemen</h2>
         <ul>
-          <li><strong>User</strong> — Kelola akun pengguna</li>
-          <li><strong>Kursus</strong> — Kelola kursus & materi</li>
-          <li><strong>Rombel</strong> — Kelola kelas & anggota</li>
+          <li><strong>User</strong></li>
+          <li><strong>Kursus</strong></li>
+          <li><strong>Rombel</strong></li>
         </ul>
       </div>
-      <a href="/dashboard" class="btn">Kembali ke Dashboard</a>
+      <a href="/dashboard" class="btn">Kembali</a>
     </main>
   </div>
 </body>
 </html>`);
 });
 
-// ═══════════════════════════════════════════════
 // Public routes
-// ═══════════════════════════════════════════════
-
 app.get("/", (c) => {
   return c.html(html`<!DOCTYPE html>
 <html lang="id">
@@ -200,53 +201,21 @@ app.get("/", (c) => {
         </ul>
       </div>
     </main>
-    <footer>
-      <p>© 2026 Annawawi Institute</p>
-    </footer>
+    <footer><p>© 2026 Annawawi Institute</p></footer>
   </div>
 </body>
 </html>`);
 });
 
-// API health check
 app.get("/api/health", (c) => {
-  return c.json({
-    status: "ok",
-    app: "LMS Annawawi",
-    version: "0.1.0",
-    timestamp: new Date().toISOString(),
-  });
+  return c.json({ status: "ok", app: "LMS Annawawi", version: "0.1.0", timestamp: new Date().toISOString() });
 });
-
-// ═══════════════════════════════════════════════
-// 404
-// ═══════════════════════════════════════════════
 
 app.notFound((c) => {
-  return c.html(html`<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <title>404 — LMS Annawawi</title>
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body>
-  <div class="container">
-    <h1>404</h1>
-    <p>Halaman tidak ditemukan.</p>
-    <a href="/" class="btn">Kembali</a>
-  </div>
-</body>
-</html>`);
+  console.log("[404] Unmatched route:", c.req.method, c.req.url);
+  return c.html(html`<!DOCTYPE html><html><head><title>404</title><link rel="stylesheet" href="/styles.css"></head><body><div class="container"><h1>404</h1><p>Halaman tidak ditemukan.</p><a href="/" class="btn">Kembali</a></div></body></html>`, 404);
 });
 
-// ═══════════════════════════════════════════════
-// Error handler
-// ═══════════════════════════════════════════════
-
-app.onError((err, c) => {
-  console.error(err);
-  return c.json({ error: "internal_server_error" }, 500);
-});
+app.onError((err, c) => { console.error(err); return c.json({ error: "internal" }, 500); });
 
 export default app;
