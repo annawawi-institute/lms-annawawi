@@ -222,6 +222,60 @@ footer {
   font-size: 0.875rem;
 }
 
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.stat-card strong {
+  display: block;
+  font-size: 1.75rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.stat-card span {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.progress-bar {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.3s;
+}
+
+.badge-info {
+  background: #e8f0fe;
+  color: var(--primary);
+}
+
+.course-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
 @media (max-width: 600px) {
   table {
     font-size: 0.8125rem;

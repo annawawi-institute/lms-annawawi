@@ -5,6 +5,8 @@ import { html } from "hono/html";
 import { getMigrations } from "better-auth/db/migration";
 import { createAuth } from "./lib/auth";
 import { courseRoutes } from "./routes/courses";
+import { rombelRoutes } from "./routes/rombels";
+import { dashboardRoutes } from "./routes/dashboard";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -12,6 +14,8 @@ app.use("*", logger());
 
 // Course routes
 app.route("/", courseRoutes);
+app.route("/", rombelRoutes);
+app.route("/", dashboardRoutes);
 
 // Test route — verify Hono routing works
 app.get("/tes", (c) => {
@@ -101,48 +105,7 @@ app.get("/login", async (c) => {
 </html>`);
 });
 
-// Dashboard
-app.get("/dashboard", async (c) => {
-  const user = await getUser(c);
-  if (!user) return c.redirect("/login");
-  return c.html(html`<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard — LMS Annawawi</title>
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Dashboard</h1>
-      <p>Selamat datang, ${user.name}!</p>
-      <p>Role: <strong>${user.role}</strong></p>
-    </header>
-    <main>
-      <div class="card">
-        <h2>Kursus Anda</h2>
-        <ul>
-          <li><strong>Dokumen AGE</strong> — Pembukaan</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h2>Akun</h2>
-        <p>Email: ${user.email}</p>
-        <div class="actions">
-          <form method="POST" action="/api/auth/sign-out">
-            <button type="submit" class="btn">Keluar</button>
-          </form>
-        </div>
-      </div>
-    </main>
-  </div>
-</body>
-</html>`);
-});
-
-// Admin
+// Login, Dashboard, Admin ada di routes/dashboard.ts dan di sini untuk backward compat
 app.get("/admin", async (c) => {
   const user = await getUser(c);
   if (!user) return c.redirect("/login");
