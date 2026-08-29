@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+.wrangler/
+dist/
+
+# Local DB
+*.db
+*.sqlite
+
+# Env files
+.env
+.env.local
+.dev.vars
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log

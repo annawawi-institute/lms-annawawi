@@ -1,0 +1,49 @@
+// Wrangler config — LMS Annawawi Cloudflare Worker
+// Cloudflare Docs https://developers.cloudflare.com/workers/wrangler/configuration/
+
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lms-annawawi",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static assets binding (public/ directory)
+  "assets": { "directory": "public" },
+
+  // D1 database binding
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lms-annawawi-db",
+      "database_id": "d7652ede-8bb2-4922-a888-08789afe6a79",
+      "migrations_dir": "./drizzle"
+    }
+  ],
+
+  // R2 bucket — uncomment after enabling R2 in Cloudflare Dashboard
+  // "r2_buckets": [
+  //   {
+  //     "binding": "R2",
+  //     "bucket_name": "lms-annawawi-assets"
+  //   }
+  // ],
+
+  // Enable Workers AI if needed later
+  // "ai": { "binding": "AI" },
+
+  // Environment variables (non-secret)
+  "vars": {
+    "WORKER_ENV": "production",
+    "APP_NAME": "LMS Annawawi"
+  },
+
+  // Secrets — set via wrangler secret put
+  // AUTH_SECRET, AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET, TALLY_WEBHOOK_SECRET
+
+  // Observability
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  }
+}
