@@ -8,7 +8,8 @@ import { courseRoutes } from "./routes/courses";
 import { rombelRoutes } from "./routes/rombels";
 import { dashboardRoutes } from "./routes/dashboard";
 import { userRoutes } from "./routes/users";
-import { cspWithEmbed, rateLimit } from "./middleware/security";
+import { quizRoutes } from "./routes/quizzes";
+import { rateLimit } from "./middleware/security";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -30,6 +31,7 @@ app.route("/", courseRoutes);
 app.route("/", rombelRoutes);
 app.route("/", dashboardRoutes);
 app.route("/", userRoutes);
+app.route("/", quizRoutes);
 
 // Public API rate limit
 app.use("/api/*", rateLimit(120, 60000));

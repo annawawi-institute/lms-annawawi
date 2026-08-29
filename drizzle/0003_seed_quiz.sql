@@ -1,0 +1,3 @@
+INSERT INTO quiz_questions (id, quiz_id, prompt, options, correct_keys, points, position) VALUES ('qq-1', 'quiz-pembukaan', 'Apa singkatan dari AGE?', '["Annawawi Global Education","Annawawi General Education","Annawawi Group Enterprise","Annawawi General English"]', '["0"]', 1, 1);
+INSERT INTO quiz_questions (id, quiz_id, prompt, options, correct_keys, points, position) VALUES ('qq-2', 'quiz-pembukaan', 'Mata pelajaran pertama dalam kursus Dokumen AGE adalah?', '["Pengantar","Pembukaan","Dasar","Intro"]', '["1"]', 1, 2);
+INSERT INTO quiz_questions (id, quiz_id, prompt, options, correct_keys, points, position) VALUES ('qq-3', 'quiz-pembukaan', 'Berapa pass score kuis ini?', '["50%","60%","70%","80%"]', '["2"]', 1, 3);
