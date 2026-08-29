@@ -35,7 +35,8 @@
   // Environment variables (non-secret)
   "vars": {
     "WORKER_ENV": "production",
-    "APP_NAME": "LMS Annawawi"
+    "APP_NAME": "LMS Annawawi",
+    "AUTH_BASE_URL": "https://lms-annawawi.annawawi-inst.workers.dev"
   },
 
   // Secrets — set via wrangler secret put
