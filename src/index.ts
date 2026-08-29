@@ -1,32 +1,60 @@
 // src/index.ts — LMS Annawawi main entry point
+// Hono + Better Auth (D1 native) + manual RBAC middleware
+
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { html } from "hono/html";
+import { getMigrations } from "better-auth/db/migration";
 import { createAuth } from "./lib/auth";
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", logger());
 
-// Helper: get auth instance from request context
-const getAuth = (env: Env) => createAuth(env);
+// ═══════════════════════════════════════════════
+// Auth: Better Auth handler for all /api/auth/*
+// ═══════════════════════════════════════════════
 
-// Auth session helper
-async function getSessionUser(c: any) {
-  const auth = getAuth(c.env);
+app.on(["GET", "POST"], "/api/auth/*", (c) => {
+  return createAuth(c.env).handler(c.req.raw);
+});
+
+// Migration endpoint (call once after deploy, then remove/protect in prod)
+app.post("/migrate", async (c) => {
+  try {
+    const auth = createAuth(c.env);
+    const { toBeCreated, toBeAdded, runMigrations } = await getMigrations(auth.options);
+    if (toBeCreated.length === 0 && toBeAdded.length === 0) {
+      return c.json({ message: "No migrations needed" });
+    }
+    await runMigrations();
+    return c.json({
+      message: "Migrations completed",
+      created: toBeCreated.map((t) => t.table),
+      added: toBeAdded.map((t) => t.table),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ═══════════════════════════════════════════════
+// Session helpers
+// ═══════════════════════════════════════════════
+
+async function getUser(c: any) {
+  const auth = createAuth(c.env);
   const session = await auth.api.getSession({ headers: c.req.raw.headers });
   return session?.user ?? null;
 }
 
 // ═══════════════════════════════════════════════
-// Auth routes
+// Login page
 // ═══════════════════════════════════════════════
 
-app.on(["GET", "POST"], "/api/auth/*", (c) => {
-  return getAuth(c.env).handler(c.req.raw);
-});
-
-app.get("/login", (c) => {
+app.get("/login", async (c) => {
+  const user = await getUser(c);
+  if (user) return c.redirect("/dashboard");
   return c.html(html`<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -57,7 +85,7 @@ app.get("/login", (c) => {
 // ═══════════════════════════════════════════════
 
 app.get("/dashboard", async (c) => {
-  const user = await getSessionUser(c);
+  const user = await getUser(c);
   if (!user) return c.redirect("/login");
   return c.html(html`<!DOCTYPE html>
 <html lang="id">
@@ -101,7 +129,7 @@ app.get("/dashboard", async (c) => {
 // ═══════════════════════════════════════════════
 
 app.get("/admin", async (c) => {
-  const user = await getSessionUser(c);
+  const user = await getUser(c);
   if (!user) return c.redirect("/login");
   if (user.role !== "admin")
     return c.html(

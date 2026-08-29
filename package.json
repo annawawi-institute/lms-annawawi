@@ -1,6 +1,6 @@
 {
   "name": "lms-annawawi",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "bunx wrangler dev --port 8787",
@@ -10,16 +10,14 @@
     "typegen": "wrangler types"
   },
   "dependencies": {
-    "hono": "^4.6.0",
     "better-auth": "^1.5.0",
-    "drizzle-orm": "^0.36.0",
-    "zod": "^3.23.0"
+    "hono": "^4.13.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "wrangler": "4",
-    "drizzle-kit": "^0.28.0",
-    "@cloudflare/workers-types": "^4.20241106.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^22.9.0"
+    "wrangler": "^4.127.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^5.9.3",
+    "@types/node": "^22.20.1"
   }
 }
