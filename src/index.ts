@@ -15,7 +15,15 @@ const app = new Hono<{ Bindings: Env }>();
 app.use("*", logger());
 
 // Security headers with CSP (embed-friendly)
-app.use("*", cspWithEmbed());
+// Note: disabled COEP require-corp as it can break embeds
+app.use("*", async (c, next) => {
+  c.header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https:; frame-src 'self' https://tally.so https://docs.google.com https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("X-Frame-Options", "SAMEORIGIN");
+  c.header("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  c.header("X-Xss-Protection", "1; mode=block");
+  await next();
+});
 
 // Course routes
 app.route("/", courseRoutes);
