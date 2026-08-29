@@ -7,17 +7,24 @@ import { createAuth } from "./lib/auth";
 import { courseRoutes } from "./routes/courses";
 import { rombelRoutes } from "./routes/rombels";
 import { dashboardRoutes } from "./routes/dashboard";
+import { userRoutes } from "./routes/users";
+import { cspWithEmbed, rateLimit } from "./middleware/security";
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", logger());
 
+// Security headers with CSP (embed-friendly)
+app.use("*", cspWithEmbed());
+
 // Course routes
 app.route("/", courseRoutes);
 app.route("/", rombelRoutes);
 app.route("/", dashboardRoutes);
+app.route("/", userRoutes);
 
-// Test route — verify Hono routing works
+// Public API rate limit
+app.use("/api/*", rateLimit(120, 60000));
 app.get("/tes", (c) => {
   return c.json({ msg: "hono routing works!", path: c.req.path });
 });

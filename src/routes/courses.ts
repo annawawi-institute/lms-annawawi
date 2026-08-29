@@ -2,6 +2,8 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { createAuth } from "../lib/auth";
+import { isEmbedAllowed, escapeHtml } from "../lib/embed";
+import { parseBody, courseSchema, lessonSchema, blockSchema } from "../lib/validations";
 
 export const courseRoutes = new Hono<{ Bindings: Env }>();
 
@@ -128,11 +130,13 @@ courseRoutes.post("/api/courses", async (c) => {
   if (user.role === "siswa") return c.json({ error: "forbidden" }, 403);
 
   const form = await c.req.parseBody();
+  const parsed = parseBody(courseSchema, form as any);
+  if (!parsed.success) return c.json({ error: "validation", details: parsed.errors }, 400);
+
   const id = crypto.randomUUID();
-  const slug = (form.slug as string).toLowerCase().replace(/[^a-z0-9-]/g, "-");
   await c.env.DB.prepare(
     "INSERT INTO courses (id, title, slug, description, status, created_by) VALUES (?, ?, ?, ?, ?, ?)"
-  ).bind(id, form.title, slug, form.description || "", form.status || "draft", user.id).run();
+  ).bind(id, parsed.data.title, parsed.data.slug, parsed.data.description, parsed.data.status, user.id).run();
 
   return c.redirect(`/admin/courses`);
 });
@@ -224,11 +228,13 @@ courseRoutes.post("/api/courses/:slug/lessons", async (c) => {
   const course = await c.env.DB.prepare("SELECT * FROM courses WHERE slug = ?").bind(c.req.param("slug")).first();
   if (!course) return c.json({ error: "not found" }, 404);
   const form = await c.req.parseBody();
+  const parsed = parseBody(lessonSchema, form as any);
+  if (!parsed.success) return c.json({ error: "validation", details: parsed.errors }, 400);
   const id = crypto.randomUUID();
   const maxPos = await c.env.DB.prepare("SELECT MAX(position) as pos FROM lessons WHERE course_id = ?").bind(course.id).first();
   const pos = ((maxPos?.pos ?? -1) + 1);
   await c.env.DB.prepare("INSERT INTO lessons (id, course_id, title, position, status) VALUES (?, ?, ?, ?, ?)")
-    .bind(id, course.id, form.title, pos, form.status || "draft").run();
+    .bind(id, course.id, parsed.data.title, pos, parsed.data.status).run();
   return c.redirect(`/admin/courses/${course.slug}/edit`);
 });
 
@@ -342,8 +348,24 @@ courseRoutes.post("/api/lessons/:id/blocks", async (c) => {
   const id = crypto.randomUUID();
   const maxPos = await c.env.DB.prepare("SELECT MAX(position) as pos FROM lesson_blocks WHERE lesson_id = ?").bind(lessonId).first();
   const pos = ((maxPos?.pos ?? -1) + 1);
-  await c.env.DB.prepare("INSERT INTO lesson_blocks (id, lesson_id, type, provider, url, position) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(id, lessonId, form.type, form.provider || null, form.url || "", pos).run();
+
+  const type = form.type as string;
+  let url = (form.url as string) || "";
+  const provider = form.provider as string | null;
+
+  // Validate embed URL against whitelist
+  if (type === "embed" && url) {
+    const check = isEmbedAllowed(url);
+    if (!check.allowed) return c.json({ error: check.error }, 400);
+    url = check.normalizedUrl || url;
+    // Use detected provider if not explicitly set
+    await c.env.DB.prepare("INSERT INTO lesson_blocks (id, lesson_id, type, provider, url, position) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, lessonId, type, provider || check.provider || null, url, pos).run();
+  } else {
+    await c.env.DB.prepare("INSERT INTO lesson_blocks (id, lesson_id, type, provider, url, position) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, lessonId, type, provider || null, url, pos).run();
+  }
+
   return c.json({ success: true, id });
 });
 
@@ -356,8 +378,18 @@ courseRoutes.post("/api/blocks/:id/update", async (c) => {
   if (!user || user.role === "siswa") return c.json({ error: "forbidden" }, 403);
   const id = c.req.param("id");
   const form = await c.req.parseBody();
+  const type = form.type as string;
+  let url = (form.url as string) || "";
+  const provider = form.provider as string | null;
+
+  if (type === "embed" && url) {
+    const check = isEmbedAllowed(url);
+    if (!check.allowed) return c.json({ error: check.error }, 400);
+    url = check.normalizedUrl || url;
+  }
+
   await c.env.DB.prepare("UPDATE lesson_blocks SET type = ?, provider = ?, url = ? WHERE id = ?")
-    .bind(form.type, form.provider || null, form.url || "", id).run();
+    .bind(type, provider || null, url, id).run();
   return c.json({ success: true });
 });
 
@@ -436,11 +468,11 @@ courseRoutes.get("/c/:slug/lessons/:lessonId", async (c) => {
 <main>
   <h2>${lesson.title}</h2>
   ${blocks.results.map((b: any) => {
-    if (b.type === "markdown") return html`<div class="card">${(b.url || "").replace(/\n/g, "<br>")}</div>`;
-    if (b.type === "embed" && b.provider === "youtube") return html`<div class="embed-wrap"><iframe src="${b.url}" allowfullscreen loading="lazy"></iframe></div>`;
-    if (b.type === "embed" && b.provider === "tally") return html`<div class="embed-wrap"><iframe src="${b.url}" loading="lazy"></iframe></div>`;
-    if (b.type === "embed" && b.provider === "google_form") return html`<div class="embed-wrap"><iframe src="${b.url}" loading="lazy"></iframe></div>`;
-    if (b.type === "callout") return html`<div class="card" style="border-left:4px solid var(--primary); padding-left:1rem"><strong>💡 ${(b.url || "").replace(/\n/g, "<br>")}</strong></div>`;
+    if (b.type === "markdown") return html`<div class="card">${escapeHtml(b.url || "").replace(/\n/g, "<br>")}</div>`;
+    if (b.type === "embed" && b.provider === "youtube") return html`<div class="embed-wrap"><iframe src="${b.url}" allowfullscreen loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups"></iframe></div>`;
+    if (b.type === "embed" && b.provider === "tally") return html`<div class="embed-wrap"><iframe src="${b.url}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe></div>`;
+    if (b.type === "embed" && b.provider === "google_form") return html`<div class="embed-wrap"><iframe src="${b.url}" loading="lazy" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe></div>`;
+    if (b.type === "callout") return html`<div class="card" style="border-left:4px solid var(--primary); padding-left:1rem"><strong>💡 ${escapeHtml(b.url || "").replace(/\n/g, "<br>")}</strong></div>`;
     return html`<div class="card">Unknown block type</div>`;
   })}
   ${user ? html`<form method="POST" action="/api/progress/${lessonId}"><button class="btn btn-primary" type="submit">${completed ? "✓ Selesai" : "Tandai Selesai"}</button></form>` : ""}

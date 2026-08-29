@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { createAuth } from "../lib/auth";
+import { parseBody, rombelSchema, joinCodeSchema } from "../lib/validations";
 
 export const rombelRoutes = new Hono<{ Bindings: Env }>();
 
@@ -101,10 +102,12 @@ rombelRoutes.post("/api/rombels", async (c) => {
   const user = await getUser(c);
   if (!user || user.role === "siswa") return c.json({ error: "forbidden" }, 403);
   const form = await c.req.parseBody();
+  const parsed = parseBody(rombelSchema, form as any);
+  if (!parsed.success) return c.json({ error: "validation", details: parsed.errors }, 400);
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
     "INSERT INTO class_groups (id, name, tahun_ajaran) VALUES (?, ?, ?)"
-  ).bind(id, form.name, form.tahun_ajaran || null).run();
+  ).bind(id, parsed.data.name, parsed.data.tahun_ajaran || null).run();
   return c.redirect("/admin/rombels");
 });
 
@@ -290,13 +293,14 @@ rombelRoutes.post("/api/join-with-code", async (c) => {
   const user = await getUser(c);
   if (!user) return c.json({ error: "unauthorized" }, 401);
   const form = await c.req.parseBody();
-  const code = (form.join_code as string).trim().toUpperCase();
+  const parsed = parseBody(joinCodeSchema, form as any);
+  if (!parsed.success) return c.html(html`<script>alert('Kode tidak valid: ${Object.values(parsed.errors).join(', ')}'); window.history.back();</script>`);
 
   const course = await c.env.DB.prepare(
     "SELECT * FROM courses WHERE UPPER(join_code) = ? AND status = 'published'"
-  ).bind(code).first();
+  ).bind(parsed.data.join_code).first();
 
-  if (!course) return c.html(html`<script>alert('Kode tidak valid.'); window.history.back();</script>`);
+  if (!course) return c.html(html`<script>alert('Kode tidak valid atau kursus tidak ditemukan.'); window.history.back();</script>`);
 
   await c.env.DB.prepare(
     "INSERT OR IGNORE INTO enrollments (course_id, user_id, source, enrolled_by, enrolled_at) VALUES (?, ?, 'join_code', ?, ?)"
