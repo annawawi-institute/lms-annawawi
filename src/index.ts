@@ -4,10 +4,14 @@ import { logger } from "hono/logger";
 import { html } from "hono/html";
 import { getMigrations } from "better-auth/db/migration";
 import { createAuth } from "./lib/auth";
+import { courseRoutes } from "./routes/courses";
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.use("*", logger());
+
+// Course routes
+app.route("/", courseRoutes);
 
 // Test route — verify Hono routing works
 app.get("/tes", (c) => {
