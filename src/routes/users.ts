@@ -20,7 +20,7 @@ userRoutes.get("/admin/users", async (c) => {
   if (!user || user.role !== "admin") return c.redirect("/login");
 
   const users = await c.env.DB.prepare(
-    "SELECT id, name, email, role, no_wa FROM user ORDER BY name"
+    "SELECT id, name, email, role, noWa FROM user ORDER BY name"
   ).all();
 
   const roles = ["admin", "guru", "siswa"];
